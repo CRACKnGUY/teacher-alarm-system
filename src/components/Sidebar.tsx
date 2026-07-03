@@ -1,7 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 
 const navItems = [
   {
@@ -53,6 +56,20 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+  }, [])
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <aside className="w-56 bg-zinc-900 text-white flex flex-col shrink-0 border-r border-zinc-800">
@@ -89,8 +106,18 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="px-5 py-4 border-t border-zinc-800">
-        <p className="text-xs text-zinc-600">v1.0.0</p>
+      <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
+        {user && (
+          <p className="text-xs text-zinc-500 truncate" title={user.email}>
+            {user.email}
+          </p>
+        )}
+        <button
+          onClick={handleSignOut}
+          className="w-full text-left text-xs text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+        >
+          Sign out
+        </button>
       </div>
     </aside>
   )

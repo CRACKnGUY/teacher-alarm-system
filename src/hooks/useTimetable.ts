@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/index'
 
 export type Slot = { id: string; day: string; periodTime: string; subject: string }
 
