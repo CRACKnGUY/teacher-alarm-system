@@ -11,13 +11,17 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+
+  function getSupabase() {
+    return createClient()
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
 
+    const supabase = getSupabase()
     if (mode === 'signup') {
       const { data, error } = await supabase.auth.signUp({ email, password })
       setLoading(false)
@@ -42,6 +46,7 @@ export default function LoginPage() {
   }
 
   async function signInWithGoogle() {
+    const supabase = getSupabase()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${location.origin}/auth/callback` },
