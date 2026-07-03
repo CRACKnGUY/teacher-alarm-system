@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useTimetable, PERIODS, DAY_NAMES } from '../hooks/useTimetable'
+import { useTimetable, DAY_NAMES } from '../hooks/useTimetable'
 
 export default function ScheduleEditor() {
-  const { timetable, days, addSlot, editSlot, deleteSlot, addDay, removeDay } = useTimetable()
+  const { timetable, days, periods, addSlot, editSlot, deleteSlot, addDay, removeDay } = useTimetable()
   const [editingCell, setEditingCell] = useState<{ day: string; periodTime: string } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [showNewDay, setShowNewDay] = useState(false)
@@ -54,7 +54,7 @@ export default function ScheduleEditor() {
               <th className="border border-zinc-800 px-3 py-2 text-left font-medium text-zinc-500 text-xs uppercase tracking-wider w-16">
                 Day
               </th>
-              {PERIODS.map((period) => {
+              {periods.map((period) => {
                 const isFixed = period.type === 'break' || period.type === 'lunch'
                 return (
                   <th
@@ -77,7 +77,7 @@ export default function ScheduleEditor() {
                 }`}>
                   {d}
                 </td>
-                {PERIODS.map((period) => {
+                {periods.map((period) => {
                   const isFixed = period.type === 'break' || period.type === 'lunch'
                   const fixedLabel = period.type === 'break' ? 'Break' : 'Lunch'
                   const subject = getSubject(d, period.time)

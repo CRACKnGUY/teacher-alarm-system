@@ -8,7 +8,9 @@ export type Slot = { id: string; day: string; periodTime: string; subject: strin
 export const DEFAULT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export const PERIODS = [
+export type Structure = 'primary' | 'secondary'
+
+export const SECONDARY_PERIODS = [
   { time: '9:20-10:00', type: 'period' },
   { time: '10:00-10:40', type: 'period' },
   { time: '10:40-10:50', type: 'break' },
@@ -22,6 +24,27 @@ export const PERIODS = [
   { time: '2:50-3:30', type: 'period' },
   { time: '4:00-5:10', type: 'period' },
 ]
+
+export const PRIMARY_PERIODS = [
+  { time: '9:20-10:00', type: 'period' },
+  { time: '10:00-10:40', type: 'period' },
+  { time: '10:40-10:50', type: 'break' },
+  { time: '10:50-11:30', type: 'period' },
+  { time: '11:30-12:10', type: 'period' },
+  { time: '12:10-12:50', type: 'lunch' },
+  { time: '12:50-1:20', type: 'lunch' },
+  { time: '1:20-2:00', type: 'period' },
+  { time: '2:00-2:10', type: 'break' },
+  { time: '2:10-2:50', type: 'period' },
+  { time: '2:50-3:30', type: 'period' },
+]
+
+export const PERIODS_BY_STRUCTURE: Record<Structure, typeof SECONDARY_PERIODS> = {
+  primary: PRIMARY_PERIODS,
+  secondary: SECONDARY_PERIODS,
+}
+
+export const PERIODS = SECONDARY_PERIODS
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
@@ -44,10 +67,16 @@ function getSupabase() {
 export function useTimetable() {
   const [timetable, setTimetable] = useState<Slot[]>([])
   const [days, setDays] = useState<string[]>(DEFAULT_DAYS)
+  const [structure, setStructureState] = useState<Structure>('secondary')
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     loadFromSupabase()
+  }, [])
+
+  useEffect(() => {
+    const saved = loadFromStorage<Structure>('teacher_structure', 'secondary')
+    setStructureState(saved)
   }, [])
 
   async function loadFromSupabase() {
@@ -148,5 +177,27 @@ export function useTimetable() {
   const getSubject = (day: string, periodTime: string) =>
     timetable.find((s) => s.day === day && s.periodTime === periodTime)?.subject ?? ''
 
-  return { timetable, days, addSlot, editSlot, deleteSlot, addDay, removeDay, getSubject, hydrated }
+  async function syncStructure(struct: Structure) {
+    try {
+      const supabase = await getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.from('profiles').upsert(
+        { id: user.id, structure: struct, updated_at: new Date().toISOString() },
+        { onConflict: 'id' },
+      )
+    } catch (e) {
+      console.error('Structure sync failed:', e)
+    }
+  }
+
+  const setStructure = (struct: Structure) => {
+    setStructureState(struct)
+    localStorage.setItem('teacher_structure', JSON.stringify(struct))
+    syncStructure(struct)
+  }
+
+  const periods = PERIODS_BY_STRUCTURE[structure]
+
+  return { timetable, days, periods, structure, setStructure, addSlot, editSlot, deleteSlot, addDay, removeDay, getSubject, hydrated }
 }

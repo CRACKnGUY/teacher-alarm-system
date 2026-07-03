@@ -7,6 +7,9 @@ import Sidebar from './Sidebar'
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Dashboard', subtitle: "Today's schedule at a glance" },
   '/timetable': { title: 'Timetable', subtitle: 'Edit your weekly schedule' },
+  '/profile': { title: 'Profile', subtitle: 'Manage your preferences' },
+  '/attendance': { title: 'Attendance', subtitle: 'View attendance records' },
+  '/alarms': { title: 'Alarms', subtitle: 'Configure alarm settings' },
 }
 
 interface Props {
