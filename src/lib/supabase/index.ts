@@ -1,9 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+function getEnv() {
+  if (typeof window !== 'undefined') {
+    return {
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    }
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  return { url, key }
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export function getSupabaseClient() {
+  const { url, key } = getEnv()
+  return createClient(url, key)
+}
+
+export const supabase = getSupabaseClient()
 
 export type Slot = {
   id: string

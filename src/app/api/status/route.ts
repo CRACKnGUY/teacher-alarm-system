@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
-import type { Slot } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 import { PERIODS, DAY_NAMES } from '@/hooks/useTimetable'
 
 export async function GET() {
   try {
+    const supabase = await createClient()
     const today = DAY_NAMES[new Date().getDay()]
     const { data, error } = await supabase
       .from('slots')
@@ -15,7 +15,7 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const slots = (data as Slot[] || []).reduce<Record<string, string>>((acc, s) => {
+    const slots = (data || []).reduce<Record<string, string>>((acc, s) => {
       acc[s.period_time] = s.subject
       return acc
     }, {} as Record<string, string>)

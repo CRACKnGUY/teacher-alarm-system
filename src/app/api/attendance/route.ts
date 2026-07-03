@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 import { DAY_NAMES, PERIODS } from '@/hooks/useTimetable'
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient()
     const body = await request.json()
     const { uid } = body
 
