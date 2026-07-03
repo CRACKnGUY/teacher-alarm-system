@@ -19,10 +19,13 @@ export default function LoginPage() {
     setLoading(true)
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       setLoading(false)
       if (error) {
         setError(error.message)
+      } else if (data.session) {
+        router.push('/dashboard')
+        router.refresh()
       } else {
         setError('Check your email for the confirmation link.')
       }
