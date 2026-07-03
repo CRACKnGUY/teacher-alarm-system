@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -12,19 +13,28 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  async function signInWithEmail(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    setLoading(false)
-
-    if (error) {
-      setError(error.message)
+    if (mode === 'signup') {
+      const { error } = await supabase.auth.signUp({ email, password })
+      setLoading(false)
+      if (error) {
+        setError(error.message)
+      } else {
+        setError('Check your email for the confirmation link.')
+      }
     } else {
-      router.push('/dashboard')
-      router.refresh()
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      setLoading(false)
+      if (error) {
+        setError(error.message)
+      } else {
+        router.push('/dashboard')
+        router.refresh()
+      }
     }
   }
 
@@ -39,9 +49,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black px-4">
       <div className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900 p-6">
-        <h1 className="text-xl font-semibold text-white text-center mb-6">Sign In</h1>
+        <h1 className="text-xl font-semibold text-white text-center mb-6">
+          {mode === 'signin' ? 'Sign In' : 'Sign Up'}
+        </h1>
 
-        <form onSubmit={signInWithEmail} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 text-sm text-white outline-none focus:border-orange-500"
             type="email"
@@ -64,9 +76,37 @@ export default function LoginPage() {
             disabled={loading}
             className="h-10 w-full rounded-lg bg-orange-500 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading
+              ? 'Please wait...'
+              : mode === 'signin'
+                ? 'Sign In'
+                : 'Sign Up'}
           </button>
         </form>
+
+        <p className="text-xs text-zinc-500 text-center mt-4">
+          {mode === 'signin' ? (
+            <>
+              No account?{' '}
+              <button
+                onClick={() => { setMode('signup'); setError('') }}
+                className="text-orange-500 hover:underline cursor-pointer"
+              >
+                Sign Up
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{' '}
+              <button
+                onClick={() => { setMode('signin'); setError('') }}
+                className="text-orange-500 hover:underline cursor-pointer"
+              >
+                Sign In
+              </button>
+            </>
+          )}
+        </p>
 
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-zinc-800" />
@@ -84,7 +124,7 @@ export default function LoginPage() {
             <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
             <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
           </svg>
-          Sign In with Google
+          {mode === 'signin' ? 'Sign In' : 'Sign Up'} with Google
         </button>
       </div>
     </div>
