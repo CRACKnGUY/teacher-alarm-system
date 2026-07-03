@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export type Slot = { id: string; day: string; periodTime: string; subject: string }
 
@@ -42,10 +43,48 @@ export function useTimetable() {
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    setTimetable(loadFromStorage<Slot[]>('teacher_timetable', []))
+    loadFromSupabase()
+  }, [])
+
+  async function loadFromSupabase() {
+    const { data, error } = await supabase.from('slots').select('*')
+    if (error || !data || data.length === 0) {
+      const cached = loadFromStorage<Slot[]>('teacher_timetable', [])
+      setTimetable(cached)
+    } else {
+      const converted: Slot[] = data.map((s) => ({
+        id: s.id,
+        day: s.day,
+        periodTime: s.period_time,
+        subject: s.subject,
+      }))
+      setTimetable(converted)
+      localStorage.setItem('teacher_timetable', JSON.stringify(converted))
+    }
     setDays(loadFromStorage<string[]>('teacher_days', DEFAULT_DAYS))
     setHydrated(true)
-  }, [])
+  }
+
+  async function syncSlot(slot: Slot) {
+    const { error } = await supabase.from('slots').upsert(
+      {
+        day: slot.day,
+        period_time: slot.periodTime,
+        subject: slot.subject,
+      },
+      { onConflict: 'day,period_time', ignoreDuplicates: false },
+    )
+    if (error) console.error('Supabase sync error:', error.message)
+  }
+
+  async function deleteSlotFromSupabase(day: string, periodTime: string) {
+    const { error } = await supabase
+      .from('slots')
+      .delete()
+      .eq('day', day)
+      .eq('period_time', periodTime)
+    if (error) console.error('Supabase delete error:', error.message)
+  }
 
   const saveTimetable = (slots: Slot[]) => {
     setTimetable(slots)
@@ -57,14 +96,24 @@ export function useTimetable() {
     localStorage.setItem('teacher_days', JSON.stringify(d))
   }
 
-  const addSlot = (slot: Omit<Slot, 'id'>) =>
-    saveTimetable([...timetable, { id: genId(), ...slot }])
+  const addSlot = (slot: Omit<Slot, 'id'>) => {
+    const newSlots = [...timetable, { id: genId(), ...slot }]
+    saveTimetable(newSlots)
+    syncSlot({ id: genId(), ...slot })
+  }
 
-  const editSlot = (id: string, subject: string) =>
-    saveTimetable(timetable.map((s) => (s.id === id ? { ...s, subject } : s)))
+  const editSlot = (id: string, subject: string) => {
+    const slot = timetable.find((s) => s.id === id)
+    const newSlots = timetable.map((s) => (s.id === id ? { ...s, subject } : s))
+    saveTimetable(newSlots)
+    if (slot) syncSlot({ ...slot, subject })
+  }
 
-  const deleteSlot = (id: string) =>
+  const deleteSlot = (id: string) => {
+    const slot = timetable.find((s) => s.id === id)
     saveTimetable(timetable.filter((s) => s.id !== id))
+    if (slot) deleteSlotFromSupabase(slot.day, slot.periodTime)
+  }
 
   const addDay = (name: string) => {
     if (!name.trim()) return

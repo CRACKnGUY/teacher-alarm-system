@@ -26,7 +26,13 @@ export async function GET() {
       subject: slots[p.time] || null,
     }))
 
-    return NextResponse.json({ day: today, schedule })
+    return NextResponse.json({
+      day: today,
+      time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+      alarm: false,
+      alarm_message: null,
+      periods: schedule,
+    })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
