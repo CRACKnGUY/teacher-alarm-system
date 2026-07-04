@@ -10,6 +10,18 @@ const options: { value: Structure; label: string; desc: string }[] = [
   { value: 'secondary', label: 'Middle-Higher Secondary', desc: '9 periods — lunch at 12:50, break at 2:40' },
 ]
 
+const LS_NAME = 'teacher_name'
+const LS_GRADES = 'teacher_grades'
+
+function loadLocal(key: string, fallback = '') {
+  if (typeof window === 'undefined') return fallback
+  try { return localStorage.getItem(key) || fallback } catch { return fallback }
+}
+
+function saveLocal(key: string, val: string) {
+  try { localStorage.setItem(key, val) } catch { /* ignore */ }
+}
+
 export default function ProfilePage() {
   const { structure, setStructure } = useTimetable()
   const [name, setName] = useState('')
@@ -19,10 +31,13 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
+    setName(loadLocal(LS_NAME))
+    setGrades(loadLocal(LS_GRADES))
+
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLoaded(true); return }
 
       const { data } = await supabase
         .from('profiles')
@@ -31,8 +46,8 @@ export default function ProfilePage() {
         .maybeSingle()
 
       if (data) {
-        setName(data.name || '')
-        setGrades(data.grades || '')
+        if (data.name) { setName(data.name); saveLocal(LS_NAME, data.name) }
+        if (data.grades) { setGrades(data.grades); saveLocal(LS_GRADES, data.grades) }
       }
       setLoaded(true)
     }
@@ -42,20 +57,22 @@ export default function ProfilePage() {
   async function save() {
     setSaving(true)
     setSaved(false)
+
+    saveLocal(LS_NAME, name)
+    saveLocal(LS_GRADES, grades)
+
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000); return }
 
     const { error } = await supabase.from('profiles').upsert(
       { id: user.id, name, grades, updated_at: new Date().toISOString() },
       { onConflict: 'id' },
     )
-    if (error) {
-      console.error('Profile save error:', error.message)
-    } else {
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    }
+    if (error) console.error('Profile save error:', error.message)
+
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
     setSaving(false)
   }
 
@@ -70,7 +87,6 @@ export default function ProfilePage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-md">
-        {/* Name & Class */}
         <div>
           <h2 className="text-lg font-semibold text-white mb-3">Teacher Info</h2>
           <div className="space-y-3">
@@ -102,7 +118,6 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* Structure */}
         <div>
           <h2 className="text-lg font-semibold text-white mb-3">Timetable Structure</h2>
           <p className="text-sm text-zinc-500 mb-3">Choose the timetable layout that matches your school level.</p>
