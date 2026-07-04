@@ -77,17 +77,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   }
 
   return (
-    <>
-      {/* Overlay on mobile */}
-      {open && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={onClose} />
-      )}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-zinc-900 text-white flex flex-col border-r border-zinc-800 transition-transform duration-200 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
+    <div
+      className={`hidden md:block transition-all duration-200 overflow-hidden shrink-0 ${
+        open ? 'w-56' : 'w-0'
+      }`}
+    >
+      <aside className="w-56 bg-zinc-900 text-white flex flex-col h-full border-r border-zinc-800">
         <div className="px-5 py-5 border-b border-zinc-800">
           <p className="font-semibold text-sm text-orange-500">Teacher System</p>
         </div>
@@ -124,6 +119,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
       </aside>
-    </>
+    </div>
   )
 }
