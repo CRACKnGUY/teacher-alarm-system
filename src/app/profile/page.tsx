@@ -4,7 +4,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import { useTimetable, type Structure } from '@/hooks/useTimetable'
 
 const options: { value: Structure; label: string; desc: string }[] = [
-  { value: 'primary', label: 'Primary', desc: '7 periods — lunch at 12:10, break at 2:00' },
+  { value: 'primary', label: 'Primary', desc: '8 periods — lunch at 12:10, break at 2:00' },
   { value: 'secondary', label: 'Middle-Higher Secondary', desc: '9 periods — lunch at 12:50, break at 2:40' },
 ]
 
