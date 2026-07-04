@@ -6,7 +6,12 @@ import { getCurrentPeriodIndex, parseTimeRange } from '@/lib/period-utils'
 
 function fmt(n: number) { return n.toString().padStart(2, '0') }
 
-export default function TodaySchedule() {
+interface TodayScheduleProps {
+  dailySubjects?: Record<string, string> | null
+  onDailyEdit?: (periodTime: string, subject: string) => void
+}
+
+export default function TodaySchedule({ dailySubjects, onDailyEdit }: TodayScheduleProps) {
   const { timetable, periods, addSlot, editSlot, deleteSlot } = useTimetable()
   const today = DAY_NAMES[new Date().getDay()]
   const [editingCell, setEditingCell] = useState<{ periodTime: string } | null>(null)
@@ -26,7 +31,7 @@ export default function TodaySchedule() {
   const currentIndex = getCurrentPeriodIndex(periods)
   const currentPeriod = currentIndex >= 0 ? periods[currentIndex] : null
   const currentSubject = currentPeriod && currentPeriod.type === 'period'
-    ? timetable.find((s) => s.day === today && s.periodTime === currentPeriod.time)?.subject || ''
+    ? (dailySubjects?.[currentPeriod.time] || timetable.find((s) => s.day === today && s.periodTime === currentPeriod.time)?.subject || '')
     : ''
 
   // 12-hour clock
@@ -46,18 +51,23 @@ export default function TodaySchedule() {
   }
 
   function getSubject(periodTime: string) {
-    return timetable.find((s) => s.day === today && s.periodTime === periodTime)?.subject
+    if (dailySubjects) return dailySubjects[periodTime] || ''
+    return timetable.find((s) => s.day === today && s.periodTime === periodTime)?.subject || ''
   }
 
   function commitCell(periodTime: string) {
     const val = editingValue.trim()
-    const existing = timetable.find((s) => s.day === today && s.periodTime === periodTime)
-    if (!val) {
-      if (existing) deleteSlot(existing.id)
-    } else if (existing) {
-      editSlot(existing.id, val)
+    if (onDailyEdit) {
+      onDailyEdit(periodTime, val)
     } else {
-      addSlot({ day: today, periodTime, subject: val })
+      const existing = timetable.find((s) => s.day === today && s.periodTime === periodTime)
+      if (!val) {
+        if (existing) deleteSlot(existing.id)
+      } else if (existing) {
+        editSlot(existing.id, val)
+      } else {
+        addSlot({ day: today, periodTime, subject: val })
+      }
     }
     setEditingCell(null)
     setEditingValue('')

@@ -7,7 +7,6 @@ const navItems = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Timetable', path: '/timetable' },
   { label: 'Attendance', path: '/attendance' },
-  { label: 'Alarms', path: '/alarms' },
   { label: 'Profile', path: '/profile' },
 ]
 
