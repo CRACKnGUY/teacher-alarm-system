@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
@@ -20,14 +20,26 @@ interface Props {
 export default function DashboardLayout({ children }: Props) {
   const pathname = usePathname()
   const info = pageTitles[pathname] || { title: 'Dashboard', subtitle: '' }
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   return (
     <div className="min-h-screen flex bg-black">
-      <Sidebar />
-      <div className="flex-1 flex flex-col pb-16 md:pb-0">
-        <header className="border-b border-zinc-800 px-4 md:px-8 py-4">
-          <h1 className="text-lg md:text-xl font-semibold text-white">{info.title}</h1>
-          <p className="text-xs md:text-sm text-zinc-500 mt-0.5">{info.subtitle}</p>
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 flex flex-col pb-16 md:pb-0 min-w-0">
+        <header className="border-b border-zinc-800 px-4 md:px-8 py-3 flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="shrink-0 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
+            </svg>
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-xl font-semibold text-white truncate">{info.title}</h1>
+            <p className="text-xs md:text-sm text-zinc-500 truncate">{info.subtitle}</p>
+          </div>
         </header>
         <main className="flex-1 p-4 md:p-8">
           {children}

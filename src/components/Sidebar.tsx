@@ -54,7 +54,12 @@ const navItems = [
   },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  open: boolean
+  onClose: () => void
+}
+
+export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -72,41 +77,53 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 bg-zinc-900 text-white flex flex-col shrink-0 border-r border-zinc-800">
-      <div className="px-5 py-5 border-b border-zinc-800">
-        <p className="font-semibold text-sm text-orange-500">Teacher System</p>
-      </div>
+    <>
+      {/* Overlay on mobile */}
+      {open && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={onClose} />
+      )}
 
-      <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map((item) => (
-          <Link
-            key={item.label}
-            href={item.path}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-              pathname === item.path
-                ? 'bg-orange-500/10 text-orange-500'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
+      <aside
+        className={`fixed md:relative z-50 md:z-auto w-56 bg-zinc-900 text-white flex flex-col shrink-0 border-r border-zinc-800 h-full transition-transform duration-200 ${
+          open ? 'translate-x-0' : '-translate-x-full md:-translate-x-full'
+        }`}
+      >
+        <div className="px-5 py-5 border-b border-zinc-800">
+          <p className="font-semibold text-sm text-orange-500">Teacher System</p>
+        </div>
+
+        <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
+          {navItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.path}
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                pathname === item.path
+                  ? 'bg-orange-500/10 text-orange-500'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
+          {user && (
+            <p className="text-xs text-zinc-500 truncate" title={user.email}>
+              {user.email}
+            </p>
+          )}
+          <button
+            onClick={handleSignOut}
+            className="w-full text-left text-xs text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
           >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-
-      <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
-        {user && (
-          <p className="text-xs text-zinc-500 truncate" title={user.email}>
-            {user.email}
-          </p>
-        )}
-        <button
-          onClick={handleSignOut}
-          className="w-full text-left text-xs text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-        >
-          Sign out
-        </button>
-      </div>
-    </aside>
+            Sign out
+          </button>
+        </div>
+      </aside>
+    </>
   )
 }
