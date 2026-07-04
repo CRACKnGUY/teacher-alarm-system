@@ -7,9 +7,14 @@
 
 unsigned long lastApiCall = 0;
 const unsigned long API_INTERVAL = 30000;
+unsigned long lastPeriodCheck = 0;
+const unsigned long PERIOD_CHECK_INTERVAL = 10000;
 
 StatusResponse currentStatus;
 bool alarmHandled = false;
+
+String lastPeriodTime = "";
+const char* STRUCTURE = "secondary";
 
 void setup() {
   Serial.begin(115200);
@@ -40,6 +45,26 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
+
+  if (now - lastPeriodCheck >= PERIOD_CHECK_INTERVAL) {
+    lastPeriodCheck = now;
+
+    if (isWiFiConnected()) {
+      CurrentPeriodResponse periodRes;
+      if (fetchCurrentPeriod(periodRes, STRUCTURE)) {
+        if (periodRes.isActive && periodRes.subjectAssigned && periodRes.periodTime != lastPeriodTime) {
+          lastPeriodTime = periodRes.periodTime;
+          buzzerBeep(300);
+          delay(200);
+          buzzerBeep(300);
+          String msg = "Period: " + periodRes.subject;
+          showOverlay(msg.c_str(), TFT_ORANGE);
+        } else if (!periodRes.isActive) {
+          lastPeriodTime = "";
+        }
+      }
+    }
+  }
 
   if (now - lastApiCall >= API_INTERVAL) {
     lastApiCall = now;

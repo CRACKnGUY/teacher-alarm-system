@@ -74,4 +74,62 @@ bool fetchStatus(StatusResponse& out) {
   return true;
 }
 
+struct CurrentPeriodResponse {
+  String day;
+  String serverTime;
+  int periodIndex;
+  String periodTime;
+  String periodType;
+  String subject;
+  bool isActive;
+  bool subjectAssigned;
+  int elapsedMinutes;
+};
+
+bool fetchCurrentPeriod(CurrentPeriodResponse& out, const char* structure = "secondary") {
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  if (!client.connect(API_HOST, API_PORT)) {
+    return false;
+  }
+
+  client.print(String("GET /api/current-period?structure=") + structure + " HTTP/1.1\r\n" +
+               "Host: " + API_HOST + "\r\n" +
+               "Connection: close\r\n\r\n");
+
+  while (client.connected() && !client.available()) {
+    delay(10);
+  }
+
+  String body;
+  bool headersDone = false;
+  while (client.available()) {
+    String line = client.readStringUntil('\n');
+    if (!headersDone) {
+      if (line == "\r") headersDone = true;
+      continue;
+    }
+    body += line;
+  }
+
+  client.stop();
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, body);
+  if (err) return false;
+
+  out.day = doc["day"].as<String>();
+  out.serverTime = doc["server_time"].as<String>();
+  out.periodIndex = doc["period_index"] | -1;
+  out.periodTime = doc["period_time"].as<String>();
+  out.periodType = doc["period_type"].as<String>();
+  out.subject = doc["subject"].as<String>();
+  out.isActive = doc["is_active"] | false;
+  out.subjectAssigned = doc["subject_assigned"] | false;
+  out.elapsedMinutes = doc["elapsed_minutes"] | 0;
+
+  return true;
+}
+
 #endif
