@@ -13,7 +13,7 @@ const options: { value: Structure; label: string; desc: string }[] = [
 export default function ProfilePage() {
   const { structure, setStructure } = useTimetable()
   const [name, setName] = useState('')
-  const [classVal, setClassVal] = useState('')
+  const [grades, setGrades] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -26,13 +26,13 @@ export default function ProfilePage() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('name, class')
+        .select('name, grades')
         .eq('id', user.id)
         .maybeSingle()
 
       if (data) {
         setName(data.name || '')
-        setClassVal(data.class || '')
+        setGrades(data.grades || '')
       }
       setLoaded(true)
     }
@@ -47,7 +47,7 @@ export default function ProfilePage() {
     if (!user) return
 
     const { error } = await supabase.from('profiles').upsert(
-      { id: user.id, name, class: classVal, updated_at: new Date().toISOString() },
+      { id: user.id, name, grades, updated_at: new Date().toISOString() },
       { onConflict: 'id' },
     )
     if (error) {
@@ -84,12 +84,12 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Class</label>
+              <label className="block text-xs text-zinc-500 mb-1">Grades you handle</label>
               <input
                 className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-orange-500 transition-colors"
-                value={classVal}
-                onChange={(e) => setClassVal(e.target.value)}
-                placeholder="e.g. 5-A"
+                value={grades}
+                onChange={(e) => setGrades(e.target.value)}
+                placeholder="e.g. X-XII"
               />
             </div>
           </div>
