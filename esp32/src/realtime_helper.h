@@ -13,6 +13,12 @@ const char* SUPABASE_WS_URL = "wss://YOUR_PROJECT.supabase.co/realtime/v1/websoc
 
 WebSocketsClient webSocket;
 
+// Alarm state (set from callback, read in loop)
+volatile bool alarmPending = false;
+String alarmSubject = "";
+unsigned long alarmStartMs = 0;
+bool buzzerRunning = false;
+
 void realtimeCallback(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_DISCONNECTED:
@@ -22,6 +28,7 @@ void realtimeCallback(WStype_t type, uint8_t* payload, size_t length) {
     case WStype_CONNECTED:
       Serial.println("[RT] Connected");
       webSocket.sendTXT("[null,\"1\",\"realtime:slots\",\"phx_join\",{}]");
+      webSocket.sendTXT("[null,\"2\",\"realtime:alarm_events\",\"phx_join\",{}]");
       break;
 
     case WStype_TEXT: {
@@ -36,22 +43,30 @@ void realtimeCallback(WStype_t type, uint8_t* payload, size_t length) {
         webSocket.sendTXT("[null,\"" + ref + "\",\"phoenix\",\"heartbeat\",{}]");
       }
 
-      // ── Postgres change ──
-      if (doc[3] == "postgres_changes") {
+      // ── Postgres change: slots ──
+      if (doc[3] == "postgres_changes" && doc[2] == "realtime:slots") {
         JsonObject data = doc[4]["data"];
         const char* eventType = data["type"];
         if (strcmp(eventType, "UPDATE") == 0 || strcmp(eventType, "INSERT") == 0) {
           JsonObject record = data["record"];
-          String subject = record["subject"].as<String>();
-          if (subject.length() > 0) {
-            String day = record["day"].as<String>();
-            String periodTime = record["period_time"].as<String>();
-            String msg = day + " " + periodTime + ": " + subject;
-            showOverlay(msg.c_str(), TFT_ORANGE);
-            buzzerBeep(150);
+          String str = record["subject"].as<String>();
+          if (str.length() > 0) {
+            showOverlay(("Updated: " + str).c_str(), TFT_ORANGE);
           } else {
             showOverlay("Schedule updated", TFT_ORANGE);
           }
+        }
+      }
+
+      // ── Postgres change: alarm_events ──
+      if (doc[3] == "postgres_changes" && doc[2] == "realtime:alarm_events") {
+        JsonObject data = doc[4]["data"];
+        const char* eventType = data["type"];
+        if (strcmp(eventType, "INSERT") == 0) {
+          JsonObject record = data["record"];
+          alarmSubject = record["subject"].as<String>();
+          alarmPending = true;
+          Serial.printf("[RT] Alarm: %s\n", alarmSubject.c_str());
         }
       }
       break;

@@ -46,8 +46,35 @@ void setup() {
   Serial.println("[RT] Connecting to Supabase Realtime...");
 }
 
+void handleAlarm() {
+  if (!alarmPending) return;
+
+  unsigned long now = millis();
+
+  if (!buzzerRunning) {
+    // Start alarm
+    buzzerRunning = true;
+    alarmStartMs = now;
+    digitalWrite(BUZZER_PIN, HIGH);
+    String msg = "Late to " + alarmSubject;
+    showOverlay(msg.c_str(), TFT_RED);
+    Serial.printf("[ALARM] %s\n", msg.c_str());
+  }
+
+  // Stop after 10 seconds
+  if (now - alarmStartMs >= 10000) {
+    digitalWrite(BUZZER_PIN, LOW);
+    buzzerRunning = false;
+    alarmPending = false;
+    alarmSubject = "";
+    drawSchedule(currentStatus); // restore normal display
+    Serial.println("[ALARM] Stopped");
+  }
+}
+
 void loop() {
   loopRealtime();
+  handleAlarm();
 
   unsigned long now = millis();
 
