@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useTimetable, DAY_NAMES } from '../hooks/useTimetable'
+import DayView from './DayView'
 
 export default function ScheduleEditor() {
   const { timetable, days, periods, addSlot, editSlot, deleteSlot, addDay, removeDay } = useTimetable()
+  const [view, setView] = useState<'grid' | 'day'>('grid')
   const [editingCell, setEditingCell] = useState<{ day: string; periodTime: string } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [showNewDay, setShowNewDay] = useState(false)
@@ -37,16 +39,36 @@ export default function ScheduleEditor() {
 
   return (
     <div className="space-y-4">
+      {/* View toggle */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Timetable</h2>
-        <button
-          onClick={() => { setShowNewDay(true); setNewDayName('') }}
-          className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded transition-colors cursor-pointer"
-        >
-          + Day
-        </button>
+        <div className="flex gap-1 rounded-lg border border-zinc-800 p-0.5">
+          {(['grid', 'day'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                view === v
+                  ? 'bg-orange-500/15 text-orange-500'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {v === 'grid' ? 'Grid' : 'Day'}
+            </button>
+          ))}
+        </div>
+        {view === 'grid' && (
+          <button
+            onClick={() => { setShowNewDay(true); setNewDayName('') }}
+            className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded transition-colors cursor-pointer"
+          >
+            + Day
+          </button>
+        )}
       </div>
 
+      {view === 'day' ? (
+        <DayView />
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse min-w-[900px]">
           <thead>
@@ -135,6 +157,7 @@ export default function ScheduleEditor() {
           </tbody>
         </table>
       </div>
+      )}
 
       {showNewDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setShowNewDay(false)}>
