@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useTimetable, DAY_NAMES } from '../hooks/useTimetable'
 import { getCurrentPeriodIndex, parseTimeRange } from '@/lib/period-utils'
 
+function fmt(n: number) { return n.toString().padStart(2, '0') }
+
 export default function TodaySchedule() {
   const { timetable, periods, addSlot, editSlot, deleteSlot } = useTimetable()
   const today = DAY_NAMES[new Date().getDay()]
@@ -30,7 +32,6 @@ export default function TodaySchedule() {
   // 12-hour clock
   const h12 = ((now.getHours() + 11) % 12) + 1
   const ampm = now.getHours() >= 12 ? 'PM' : 'AM'
-  const clock = `${h12}:${fmt(now.getMinutes())}:${fmt(now.getSeconds())} ${ampm}`
 
   // Escalation
   const minsElapsed = currentPeriod && currentPeriod.type === 'period' && currentSubject
@@ -43,8 +44,6 @@ export default function TodaySchedule() {
     else if (minsElapsed >= 5) alarmLevel = 'late'
     else if (minsElapsed >= 0) alarmLevel = 'active'
   }
-
-  function fmt(n: number) { return n.toString().padStart(2, '0') }
 
   function getSubject(periodTime: string) {
     return timetable.find((s) => s.day === today && s.periodTime === periodTime)?.subject
@@ -64,17 +63,13 @@ export default function TodaySchedule() {
     setEditingValue('')
   }
 
-  function isCurrent(periodTime: string) {
+  function isCurrentTime(periodTime: string) {
     const m = now.getHours() * 60 + now.getMinutes()
     const { start, end } = parseTimeRange(periodTime)
     return m >= start && m < end
   }
 
-  function statusLabel(period: { time: string; type: string }, subject: string | undefined) {
-    if (period.type === 'break') return 'Break'
-    if (period.type === 'lunch') return 'Lunch'
-    return subject || 'Free'
-  }
+  const isFixed = (t: string) => t === 'break' || t === 'lunch'
 
   const alertColors: Record<string, string> = {
     active: 'border-orange-500/30 bg-orange-500/10 text-orange-400',
@@ -89,11 +84,11 @@ export default function TodaySchedule() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-semibold text-white">{today}</h2>
-        <div className="font-mono text-xl text-orange-500 tabular-nums">{clock}</div>
+    <div>
+      {/* Header with clock */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-white">Today — {today}</h2>
+        <div className="font-mono text-xl text-orange-500 tabular-nums">{h12}:{fmt(now.getMinutes())}:{fmt(now.getSeconds())} {ampm}</div>
       </div>
 
       {/* Escalation alert */}
@@ -114,76 +109,88 @@ export default function TodaySchedule() {
         </div>
       )}
 
-      {/* Period list */}
-      <div className="space-y-1">
-        {periods.map((period) => {
-          const active = isCurrent(period.time)
-          const subject = getSubject(period.time)
-          const isFixed = period.type === 'break' || period.type === 'lunch'
-          const editing = editingCell?.periodTime === period.time
-
-          return (
-            <div
-              key={period.time}
-              className={`flex items-center rounded-lg border transition-colors ${
-                active
-                  ? alarmLevel === 'escalated'
-                    ? 'border-red-600/40 bg-red-600/15'
-                    : alarmLevel === 'late'
-                      ? 'border-red-500/30 bg-red-500/10'
-                      : 'border-orange-500/40 bg-orange-500/10'
-                  : 'border-zinc-800 bg-zinc-900/50'
-              } ${editing ? '' : 'cursor-pointer hover:border-zinc-700'}`}
-              onClick={() => {
-                if (!isFixed && !editing) {
-                  setEditingCell({ periodTime: period.time })
-                  setEditingValue(subject || '')
-                }
-              }}
-            >
-              <div className={`w-24 shrink-0 px-3 py-2.5 text-xs font-mono ${
-                active ? 'text-orange-400' : 'text-zinc-500'
+      {/* Horizontal grid */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse min-w-[900px]">
+          <thead>
+            <tr>
+              <th className="border border-zinc-800 px-3 py-2 text-left font-medium text-zinc-500 text-xs uppercase tracking-wider w-16">Day</th>
+              {periods.map((period) => {
+                const fixed = isFixed(period.type)
+                return (
+                  <th
+                    key={period.time}
+                    className={`border border-zinc-800 px-2 py-2 text-center text-xs font-medium ${
+                      fixed ? 'text-zinc-600' : 'text-zinc-400'
+                    } ${isCurrentTime(period.time) ? 'bg-orange-500/15' : fixed ? 'bg-zinc-900/30' : ''}`}
+                  >
+                    {period.time}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className={`border border-zinc-800 px-3 py-2 text-xs font-medium ${
+                alarmLevel === 'escalated' ? 'text-red-500' : alarmLevel === 'late' ? 'text-red-400' : 'text-orange-500'
               }`}>
-                {period.time}
-              </div>
-              <div className="flex-1 px-3 py-2.5 text-xs">
-                {editing ? (
-                  <input
-                    ref={inputRef}
-                    className="w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-white outline-none focus:border-orange-500"
-                    value={editingValue}
-                    onChange={(e) => setEditingValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitCell(period.time)
-                      if (e.key === 'Escape') { setEditingCell(null); setEditingValue('') }
+                {today}
+              </td>
+              {periods.map((period) => {
+                const fixed = isFixed(period.type)
+                const fixedLabel = period.type === 'break' ? 'Break' : 'Lunch'
+                const subject = getSubject(period.time)
+                const editing = editingCell?.periodTime === period.time
+                const active = isCurrentTime(period.time)
+
+                if (fixed) {
+                  return (
+                    <td key={period.time} className="border border-zinc-800 px-2 py-3 text-center text-xs italic text-zinc-600 bg-zinc-900/20">
+                      {fixedLabel}
+                    </td>
+                  )
+                }
+
+                return (
+                  <td
+                    key={period.time}
+                    className={`border border-zinc-800 px-2 py-2 text-center cursor-pointer hover:bg-zinc-900/50 transition-colors min-w-[80px] ${
+                      active && alarmLevel === 'escalated' ? 'bg-red-600/15' :
+                      active && alarmLevel === 'late' ? 'bg-red-500/10' :
+                      active ? 'bg-orange-500/10' : ''
+                    }`}
+                    onClick={() => {
+                      setEditingCell({ periodTime: period.time })
+                      setEditingValue(subject || '')
                     }}
-                    onBlur={() => commitCell(period.time)}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="Subject"
-                    autoFocus
-                  />
-                ) : (
-                  <span className={
-                    isFixed
-                      ? 'italic text-zinc-600'
-                      : subject
-                        ? 'text-white font-medium'
-                        : 'text-zinc-700'
-                  }>
-                    {statusLabel(period, subject)}
-                  </span>
-                )}
-              </div>
-              <div className="w-6 shrink-0 pr-3 text-right">
-                {period.type === 'period' && subject && (
-                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                    active && alarmLevel !== 'escalated' ? 'bg-orange-500' : active && alarmLevel === 'late' ? 'bg-red-500' : active && alarmLevel === 'escalated' ? 'bg-red-600' : 'bg-zinc-700'
-                  }`} />
-                )}
-              </div>
-            </div>
-          )
-        })}
+                  >
+                    {editing ? (
+                      <input
+                        ref={inputRef}
+                        className="w-full rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-white text-center outline-none focus:border-orange-500"
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitCell(period.time)
+                          if (e.key === 'Escape') { setEditingCell(null); setEditingValue('') }
+                        }}
+                        onBlur={() => commitCell(period.time)}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Subject"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className={`text-xs ${subject ? 'text-white font-medium' : 'text-zinc-700'}`}>
+                        {subject || 'Free'}
+                      </span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )
