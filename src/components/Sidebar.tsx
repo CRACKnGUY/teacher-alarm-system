@@ -84,8 +84,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       )}
 
       <aside
-        className={`fixed md:relative z-50 md:z-auto w-56 bg-zinc-900 text-white flex flex-col shrink-0 border-r border-zinc-800 h-full transition-transform duration-200 ${
-          open ? 'translate-x-0' : '-translate-x-full md:-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 w-56 bg-zinc-900 text-white flex flex-col border-r border-zinc-800 transition-transform duration-200 ${
+          open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="px-5 py-5 border-b border-zinc-800">
