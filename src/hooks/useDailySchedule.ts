@@ -3,12 +3,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+const REVIEWED_PREFIX = 'daily_reviewed_'
+
 export function useDailySchedule(date: string) {
   const [dailySubjects, setDailySubjects] = useState<Record<string, string> | null>(null)
   const [loading, setLoading] = useState(true)
   const [exists, setExists] = useState(false)
 
   useEffect(() => {
+    const locallyReviewed = localStorage.getItem(REVIEWED_PREFIX + date)
+    if (locallyReviewed) {
+      setExists(true)
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     async function fetch() {
       const supabase = createClient()
@@ -30,6 +39,7 @@ export function useDailySchedule(date: string) {
           }
           setDailySubjects(map)
           setExists(true)
+          localStorage.setItem(REVIEWED_PREFIX + date, 'true')
         }
         setLoading(false)
       }
@@ -53,6 +63,7 @@ export function useDailySchedule(date: string) {
 
     setDailySubjects(subjects)
     setExists(true)
+    localStorage.setItem(REVIEWED_PREFIX + date, 'true')
   }, [date])
 
   return { dailySubjects, loading, exists, save }
