@@ -4,11 +4,12 @@
 #include "display_helper.h"
 #include "rfid_helper.h"
 #include "buzzer_helper.h"
+#include "realtime_helper.h"
 
 unsigned long lastApiCall = 0;
 const unsigned long API_INTERVAL = 30000;
 unsigned long lastPeriodCheck = 0;
-const unsigned long PERIOD_CHECK_INTERVAL = 10000;
+const unsigned long PERIOD_CHECK_INTERVAL = 3000;
 
 StatusResponse currentStatus;
 bool alarmHandled = false;
@@ -41,9 +42,13 @@ void setup() {
   }
 
   delay(1000);
+  initRealtime();
+  Serial.println("[RT] Connecting to Supabase Realtime...");
 }
 
 void loop() {
+  loopRealtime();
+
   unsigned long now = millis();
 
   if (now - lastPeriodCheck >= PERIOD_CHECK_INTERVAL) {

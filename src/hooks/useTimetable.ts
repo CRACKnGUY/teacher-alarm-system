@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Slot as SupabaseSlot } from '@/lib/supabase/index'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 export type Slot = { id: string; day: string; periodTime: string; subject: string }
 
@@ -77,6 +78,51 @@ export function useTimetable() {
   useEffect(() => {
     const saved = loadFromStorage<Structure>('teacher_structure', 'secondary')
     setStructureState(saved)
+  }, [])
+
+  useEffect(() => {
+    const channelRef: { current: any } = { current: null }
+
+    getSupabase().then((supabase) => {
+      channelRef.current = supabase
+        .channel('slots-changes')
+        .on<SupabaseSlot>(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'slots' },
+          (payload: RealtimePostgresChangesPayload<SupabaseSlot>) => {
+            const record = payload.new as SupabaseSlot | null
+            const oldRecord = payload.old as SupabaseSlot | null
+
+            if (payload.eventType === 'DELETE' && oldRecord) {
+              setTimetable((prev) => {
+                const next = prev.filter((s) => s.id !== oldRecord.id)
+                localStorage.setItem('teacher_timetable', JSON.stringify(next))
+                return next
+              })
+            } else if (record) {
+              const converted: Slot = {
+                id: record.id,
+                day: record.day,
+                periodTime: record.period_time,
+                subject: record.subject,
+              }
+              setTimetable((prev) => {
+                const idx = prev.findIndex((s) => s.id === converted.id)
+                const next = idx >= 0
+                  ? prev.map((s) => (s.id === converted.id ? converted : s))
+                  : [...prev, converted]
+                localStorage.setItem('teacher_timetable', JSON.stringify(next))
+                return next
+              })
+            }
+          },
+        )
+        .subscribe()
+    })
+
+    return () => {
+      if (channelRef.current) channelRef.current.unsubscribe()
+    }
   }, [])
 
   async function loadFromSupabase() {
