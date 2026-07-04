@@ -13,12 +13,6 @@ const char* SUPABASE_WS_URL = "wss://YOUR_PROJECT.supabase.co/realtime/v1/websoc
 
 WebSocketsClient webSocket;
 
-// Alarm state (set from callback, read in loop)
-volatile bool alarmPending = false;
-String alarmSubject = "";
-unsigned long alarmStartMs = 0;
-bool buzzerRunning = false;
-
 void realtimeCallback(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_DISCONNECTED:
@@ -28,7 +22,6 @@ void realtimeCallback(WStype_t type, uint8_t* payload, size_t length) {
     case WStype_CONNECTED:
       Serial.println("[RT] Connected");
       webSocket.sendTXT("[null,\"1\",\"realtime:slots\",\"phx_join\",{}]");
-      webSocket.sendTXT("[null,\"2\",\"realtime:alarm_events\",\"phx_join\",{}]");
       break;
 
     case WStype_TEXT: {
@@ -58,17 +51,6 @@ void realtimeCallback(WStype_t type, uint8_t* payload, size_t length) {
         }
       }
 
-      // ── Postgres change: alarm_events ──
-      if (doc[3] == "postgres_changes" && doc[2] == "realtime:alarm_events") {
-        JsonObject data = doc[4]["data"];
-        const char* eventType = data["type"];
-        if (strcmp(eventType, "INSERT") == 0) {
-          JsonObject record = data["record"];
-          alarmSubject = record["subject"].as<String>();
-          alarmPending = true;
-          Serial.printf("[RT] Alarm: %s\n", alarmSubject.c_str());
-        }
-      }
       break;
     }
     default:

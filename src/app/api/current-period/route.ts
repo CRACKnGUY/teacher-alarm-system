@@ -12,27 +12,44 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const today = DAY_NAMES[new Date().getDay()]
 
-    const { data, error } = await supabase
-      .from('slots')
-      .select('*')
-      .eq('day', today)
+    const [slotRes, attRes] = await Promise.all([
+      supabase.from('slots').select('*').eq('day', today),
+      supabase.from('attendance').select('*').eq('day', today),
+    ])
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    const slots = (data || []).reduce<Record<string, string>>((acc, s) => {
+    const slots = (slotRes.data || []).reduce<Record<string, string>>((acc, s) => {
       acc[s.period_time] = s.subject
       return acc
     }, {} as Record<string, string>)
 
-    const index = getCurrentPeriodIndex(periods)
-    const currentPeriod = index >= 0 ? periods[index] : null
-    const subject = currentPeriod && currentPeriod.type === 'period' ? (slots[currentPeriod.time] || '') : ''
+    const scannedPeriods = new Set((attRes.data || []).map((a) => a.period_time))
 
     const now = new Date()
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+    const index = getCurrentPeriodIndex(periods)
+    const currentPeriod = index >= 0 ? periods[index] : null
+    const subject = currentPeriod && currentPeriod.type === 'period' ? (slots[currentPeriod.time] || '') : ''
     const elapsed = currentPeriod ? currentMinutes - parseTimeRange(currentPeriod.time).start : 0
+    const attendanceRecorded = currentPeriod ? scannedPeriods.has(currentPeriod.time) : false
+
+    let alarmStatus = 'ok'
+    let alarmMessage = ''
+    if (currentPeriod && currentPeriod.type === 'period' && subject) {
+      if (attendanceRecorded) {
+        alarmStatus = 'ok'
+        alarmMessage = `Attendance recorded for ${subject}`
+      } else if (elapsed >= 10) {
+        alarmStatus = 'escalated'
+        alarmMessage = `Late to ${subject} - Office notified!`
+      } else if (elapsed >= 5) {
+        alarmStatus = 'late'
+        alarmMessage = `Late to ${subject}!`
+      } else {
+        alarmStatus = 'active'
+        alarmMessage = `${subject} starting now`
+      }
+    }
 
     return NextResponse.json({
       day: today,
@@ -44,6 +61,9 @@ export async function GET(request: Request) {
       is_active: index >= 0,
       subject_assigned: !!subject,
       elapsed_minutes: elapsed,
+      attendance_recorded: attendanceRecorded,
+      alarm_status: alarmStatus,
+      alarm_message: alarmMessage,
     })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

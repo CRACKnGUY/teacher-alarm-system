@@ -84,6 +84,9 @@ struct CurrentPeriodResponse {
   bool isActive;
   bool subjectAssigned;
   int elapsedMinutes;
+  bool attendanceRecorded;
+  String alarmStatus;
+  String alarmMessage;
 };
 
 bool fetchCurrentPeriod(CurrentPeriodResponse& out, const char* structure = "secondary") {
@@ -128,6 +131,9 @@ bool fetchCurrentPeriod(CurrentPeriodResponse& out, const char* structure = "sec
   out.isActive = doc["is_active"] | false;
   out.subjectAssigned = doc["subject_assigned"] | false;
   out.elapsedMinutes = doc["elapsed_minutes"] | 0;
+  out.attendanceRecorded = doc["attendance_recorded"] | false;
+  out.alarmStatus = doc["alarm_status"].as<String>();
+  out.alarmMessage = doc["alarm_message"].as<String>();
 
   return true;
 }

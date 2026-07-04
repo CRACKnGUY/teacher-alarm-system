@@ -4,8 +4,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useTimetable, DAY_NAMES } from '../hooks/useTimetable'
 import { getCurrentPeriodIndex, parseTimeRange } from '@/lib/period-utils'
 
-function fmt(n: number) { return n.toString().padStart(2, '0') }
-
 export default function TodaySchedule() {
   const { timetable, periods, addSlot, editSlot, deleteSlot } = useTimetable()
   const today = DAY_NAMES[new Date().getDay()]
@@ -29,9 +27,24 @@ export default function TodaySchedule() {
     ? timetable.find((s) => s.day === today && s.periodTime === currentPeriod.time)?.subject || ''
     : ''
 
-  const hh = fmt(now.getHours())
-  const mm = fmt(now.getMinutes())
-  const ss = fmt(now.getSeconds())
+  // 12-hour clock
+  const h12 = ((now.getHours() + 11) % 12) + 1
+  const ampm = now.getHours() >= 12 ? 'PM' : 'AM'
+  const clock = `${h12}:${fmt(now.getMinutes())}:${fmt(now.getSeconds())} ${ampm}`
+
+  // Escalation
+  const minsElapsed = currentPeriod && currentPeriod.type === 'period' && currentSubject
+    ? now.getHours() * 60 + now.getMinutes() - parseTimeRange(currentPeriod.time).start
+    : -1
+
+  let alarmLevel: 'none' | 'active' | 'late' | 'escalated' = 'none'
+  if (currentPeriod && currentPeriod.type === 'period' && currentSubject) {
+    if (minsElapsed >= 10) alarmLevel = 'escalated'
+    else if (minsElapsed >= 5) alarmLevel = 'late'
+    else if (minsElapsed >= 0) alarmLevel = 'active'
+  }
+
+  function fmt(n: number) { return n.toString().padStart(2, '0') }
 
   function getSubject(periodTime: string) {
     return timetable.find((s) => s.day === today && s.periodTime === periodTime)?.subject
@@ -57,35 +70,51 @@ export default function TodaySchedule() {
     return m >= start && m < end
   }
 
-  function statusColor(type: string, subject: string | undefined) {
-    if (type === 'break') return 'text-zinc-600'
-    if (type === 'lunch') return 'text-zinc-500'
-    return subject ? 'text-orange-400' : 'text-zinc-600'
-  }
-
   function statusLabel(period: { time: string; type: string }, subject: string | undefined) {
     if (period.type === 'break') return 'Break'
     if (period.type === 'lunch') return 'Lunch'
     return subject || 'Free'
   }
 
+  const alertColors: Record<string, string> = {
+    active: 'border-orange-500/30 bg-orange-500/10 text-orange-400',
+    late: 'border-red-500/30 bg-red-500/10 text-red-400',
+    escalated: 'border-red-600/40 bg-red-600/20 text-red-300',
+  }
+
+  const alertLabels: Record<string, string> = {
+    active: 'Now',
+    late: 'Late',
+    escalated: 'Escalated',
+  }
+
   return (
     <div className="max-w-lg mx-auto">
-      {/* Header: day + clock */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-lg font-semibold text-white">{today}</h2>
-        <div className="font-mono text-2xl text-orange-500 tabular-nums">{hh}:{mm}:{ss}</div>
+        <div className="font-mono text-xl text-orange-500 tabular-nums">{clock}</div>
       </div>
 
-      {/* Active period alert */}
-      {currentSubject && (
+      {/* Escalation alert */}
+      {alarmLevel !== 'none' && (
+        <div className={`mb-4 rounded-lg border px-4 py-2.5 text-sm text-center ${alertColors[alarmLevel]}`}>
+          <span className="font-semibold">{alertLabels[alarmLevel]}:</span>
+          {' '}{currentSubject} &mdash; {currentPeriod?.time}
+          {alarmLevel === 'late' && <span className="block text-xs mt-0.5 opacity-80">Teacher hasn&apos;t scanned RFID yet</span>}
+          {alarmLevel === 'escalated' && <span className="block text-xs mt-0.5 opacity-80">Office has been notified</span>}
+        </div>
+      )}
+
+      {/* Active period info */}
+      {currentSubject && alarmLevel === 'active' && (
         <div className="mb-4 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-2.5 text-sm text-orange-400 text-center">
           <span className="font-semibold text-orange-300">{currentSubject}</span>
           &nbsp;&mdash;&nbsp;{currentPeriod?.time}
         </div>
       )}
 
-      {/* Vertical period list — matches ESP32 layout exactly */}
+      {/* Period list */}
       <div className="space-y-1">
         {periods.map((period) => {
           const active = isCurrent(period.time)
@@ -98,7 +127,11 @@ export default function TodaySchedule() {
               key={period.time}
               className={`flex items-center rounded-lg border transition-colors ${
                 active
-                  ? 'border-orange-500/40 bg-orange-500/10'
+                  ? alarmLevel === 'escalated'
+                    ? 'border-red-600/40 bg-red-600/15'
+                    : alarmLevel === 'late'
+                      ? 'border-red-500/30 bg-red-500/10'
+                      : 'border-orange-500/40 bg-orange-500/10'
                   : 'border-zinc-800 bg-zinc-900/50'
               } ${editing ? '' : 'cursor-pointer hover:border-zinc-700'}`}
               onClick={() => {
@@ -108,14 +141,11 @@ export default function TodaySchedule() {
                 }
               }}
             >
-              {/* Time column */}
               <div className={`w-24 shrink-0 px-3 py-2.5 text-xs font-mono ${
                 active ? 'text-orange-400' : 'text-zinc-500'
               }`}>
                 {period.time}
               </div>
-
-              {/* Subject column */}
               <div className="flex-1 px-3 py-2.5 text-xs">
                 {editing ? (
                   <input
@@ -144,12 +174,10 @@ export default function TodaySchedule() {
                   </span>
                 )}
               </div>
-
-              {/* Status dot */}
               <div className="w-6 shrink-0 pr-3 text-right">
-                {period.type === 'period' && (
+                {period.type === 'period' && subject && (
                   <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                    active && subject ? 'bg-orange-500' : 'bg-zinc-700'
+                    active && alarmLevel !== 'escalated' ? 'bg-orange-500' : active && alarmLevel === 'late' ? 'bg-red-500' : active && alarmLevel === 'escalated' ? 'bg-red-600' : 'bg-zinc-700'
                   }`} />
                 )}
               </div>

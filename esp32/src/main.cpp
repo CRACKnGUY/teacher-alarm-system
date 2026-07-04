@@ -12,10 +12,32 @@ unsigned long lastPeriodCheck = 0;
 const unsigned long PERIOD_CHECK_INTERVAL = 3000;
 
 StatusResponse currentStatus;
-bool alarmHandled = false;
-
-String lastPeriodTime = "";
 const char* STRUCTURE = "secondary";
+
+// ── Alarm state machine ──
+String prevAlarmStatus = "ok";
+unsigned long buzzerStartMs = 0;
+int buzzerDurationMs = 0;
+bool buzzerOn = false;
+bool buzzerPulseToggle = false;
+unsigned long lastPulseToggleMs = 0;
+String lastAlarmSubject = "";
+
+void startBuzzer(int durationMs, bool continuous = true) {
+  buzzerOn = true;
+  buzzerStartMs = millis();
+  buzzerDurationMs = durationMs;
+  if (continuous) {
+    digitalWrite(BUZZER_PIN, HIGH);
+  }
+  buzzerPulseToggle = true;
+  lastPulseToggleMs = millis();
+}
+
+void stopBuzzer() {
+  digitalWrite(BUZZER_PIN, LOW);
+  buzzerOn = false;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -46,58 +68,101 @@ void setup() {
   Serial.println("[RT] Connecting to Supabase Realtime...");
 }
 
-void handleAlarm() {
-  if (!alarmPending) return;
+void handleAlarm(CurrentPeriodResponse& pr) {
+  unsigned long nowMs = millis();
 
-  unsigned long now = millis();
-
-  if (!buzzerRunning) {
-    // Start alarm
-    buzzerRunning = true;
-    alarmStartMs = now;
-    digitalWrite(BUZZER_PIN, HIGH);
-    String msg = "Late to " + alarmSubject;
-    showOverlay(msg.c_str(), TFT_RED);
-    Serial.printf("[ALARM] %s\n", msg.c_str());
+  // ── Attendance recorded → stop everything ──
+  if (pr.attendanceRecorded && pr.subjectAssigned) {
+    if (prevAlarmStatus != "ok") {
+      stopBuzzer();
+      prevAlarmStatus = "ok";
+      lastAlarmSubject = "";
+      drawSchedule(currentStatus);
+      Serial.println("[ALARM] Attendance recorded — alarms cleared");
+    }
+    return;
   }
 
-  // Stop after 10 seconds
-  if (now - alarmStartMs >= 10000) {
-    digitalWrite(BUZZER_PIN, LOW);
-    buzzerRunning = false;
-    alarmPending = false;
-    alarmSubject = "";
-    drawSchedule(currentStatus); // restore normal display
-    Serial.println("[ALARM] Stopped");
+  // ── No active period → reset ──
+  if (!pr.isActive || !pr.subjectAssigned || pr.alarmStatus == "ok") {
+    if (prevAlarmStatus != "ok") {
+      stopBuzzer();
+      prevAlarmStatus = "ok";
+      lastAlarmSubject = "";
+      if (pr.isActive) drawSchedule(currentStatus);
+    }
+    return;
+  }
+
+  String status = pr.alarmStatus;
+  String subject = pr.subject;
+
+  // ── PERIOD START (active, first 5 min) ──
+  if (status == "active" && prevAlarmStatus != "active") {
+    prevAlarmStatus = "active";
+    lastAlarmSubject = subject;
+    startBuzzer(5000, true);
+    showOverlay((subject + " - " + pr.periodTime).c_str(), TFT_ORANGE);
+    Serial.printf("[ALARM] Period start: %s\n", subject.c_str());
+  }
+
+  // ── LATE (5-10 min) ──
+  if (status == "late" && prevAlarmStatus != "late") {
+    prevAlarmStatus = "late";
+    lastAlarmSubject = subject;
+    startBuzzer(10000, true);
+    showOverlay(("Late to " + subject + "!").c_str(), TFT_RED);
+    Serial.printf("[ALARM] Late: %s\n", subject.c_str());
+  }
+
+  // ── ESCALATED (10+ min) ──
+  if (status == "escalated" && prevAlarmStatus != "escalated") {
+    prevAlarmStatus = "escalated";
+    lastAlarmSubject = subject;
+    startBuzzer(10000, true);
+    showOverlay(("Escalated: " + subject).c_str(), TFT_RED);
+    Serial.printf("[ALARM] Escalated: %s\n", subject.c_str());
+  }
+
+  // ── Non-blocking buzzer timing ──
+  if (buzzerOn) {
+    // Pulsing mode for escalated (after initial buzzer)
+    if (status == "escalated" && nowMs - buzzerStartMs > 10000) {
+      if (nowMs - lastPulseToggleMs > 2000) {
+        buzzerPulseToggle = !buzzerPulseToggle;
+        lastPulseToggleMs = nowMs;
+        digitalWrite(BUZZER_PIN, buzzerPulseToggle ? HIGH : LOW);
+      }
+    }
+    // Stop after duration for active/late (or initial escalated buzz)
+    else if (status != "escalated" && nowMs - buzzerStartMs >= buzzerDurationMs) {
+      stopBuzzer();
+      Serial.println("[ALARM] Buzzer stopped");
+    }
+    else if (status == "escalated" && nowMs - buzzerStartMs >= 10000 && nowMs - buzzerStartMs >= buzzerDurationMs) {
+      // Initial 10s done, switching to pulse mode — don't stop, just let pulse logic run
+    }
   }
 }
 
 void loop() {
   loopRealtime();
-  handleAlarm();
 
   unsigned long now = millis();
 
+  // ── Period check (every 3s) ──
   if (now - lastPeriodCheck >= PERIOD_CHECK_INTERVAL) {
     lastPeriodCheck = now;
 
     if (isWiFiConnected()) {
-      CurrentPeriodResponse periodRes;
-      if (fetchCurrentPeriod(periodRes, STRUCTURE)) {
-        if (periodRes.isActive && periodRes.subjectAssigned && periodRes.periodTime != lastPeriodTime) {
-          lastPeriodTime = periodRes.periodTime;
-          buzzerBeep(300);
-          delay(200);
-          buzzerBeep(300);
-          String msg = "Period: " + periodRes.subject;
-          showOverlay(msg.c_str(), TFT_ORANGE);
-        } else if (!periodRes.isActive) {
-          lastPeriodTime = "";
-        }
+      CurrentPeriodResponse pr;
+      if (fetchCurrentPeriod(pr, STRUCTURE)) {
+        handleAlarm(pr);
       }
     }
   }
 
+  // ── Status fetch (every 30s) ──
   if (now - lastApiCall >= API_INTERVAL) {
     lastApiCall = now;
 
@@ -108,16 +173,6 @@ void loop() {
         drawHeader(currentStatus);
         drawSchedule(currentStatus);
         drawStatusBar(true, currentStatus.hasAlarm);
-
-        if (currentStatus.hasAlarm) {
-          if (!alarmHandled) {
-            alarmHandled = true;
-            buzzerAlarm();
-            showOverlay("ALARM!", TFT_RED);
-          }
-        } else {
-          alarmHandled = false;
-        }
       } else {
         drawStatusBar(false, false);
       }
@@ -127,6 +182,7 @@ void loop() {
     }
   }
 
+  // ── RFID ──
   String uid;
   if (readRFID(uid)) {
     Serial.print("RFID: ");
